@@ -334,10 +334,7 @@ table.order-table tr.row-add td:first-child{border-left:3px solid var(--green)}
         <button onclick="changeMailWeek(1)">다음 →</button>
       </div>
       <div style="display:grid;gap:14px;max-width:700px">
-        <div class="settings-card">
-          <h3><i class="ti ti-truck"></i>수신 운송사</h3>
-          <div class="company-row" id="carrier-select" style="margin-bottom:0"></div>
-        </div>
+
         <div class="settings-card">
           <h3><i class="ti ti-mail"></i>수신 이메일</h3>
           <input id="mail-to" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit" placeholder="운송사 이메일 주소">
@@ -607,7 +604,7 @@ function renderSummary(){
   });});
   document.getElementById('summary-stats').innerHTML=`
     <div class="stat-card"><div class="num">${tc.size}</div><div class="lbl">업체</div></div>
-    <div class="stat-card"><div class="num">${td.size}</div><div class="lbl">배송일</div></div>
+    <div class="stat-card"><div class="num">${(()=>{let cnt=0;state.companies.forEach(c=>{days.forEach(d=>{const key=orderKey(fmtFull(d),c),ord=state.orders[key];if(!ord)return;cnt+=Object.values(ord.items).filter(it=>it&&it.flag).length;});});return cnt;})()}</div><div class="lbl">변경 건수</div></div>
     <div class="stat-card"><div class="num">${ti}</div><div class="lbl">품목 건수</div></div>`;
   const el=document.getElementById('summary-content');
   let hasAny=false,html='';
@@ -646,26 +643,25 @@ function renderMail(){
   document.getElementById('mail-week-label').textContent=fmtWeekRange(state.mailWeekOffset);
   const weekStr=fmtWeekRange(state.mailWeekOffset);
   let body=`안녕하세요.\n${state.senderName}입니다.\n\n${weekStr} 배차 요청 드립니다.\n\n`;
-  let hasData=false;
   days.forEach(d=>{
-    const ds=fmtFull(d);let dayBlock='';
+    const ds=fmtFull(d);
+    const dayName=`* ${DAYS_KO[d.getDay()]}요일 (${d.getMonth()+1}/${d.getDate()})`;
+    let dayBlock='';let hasAny=false;
     state.companies.forEach(c=>{
       const key=orderKey(ds,c),ord=state.orders[key];if(!ord)return;
       const items=Object.entries(ord.items).filter(([,it])=>hasRealItem(it));
-      if(!items.length&&!ord.note)return;hasData=true;
+      if(!items.length&&!ord.note)return;hasAny=true;
       const norm=items.filter(([,it])=>!it.flag),chg=items.filter(([,it])=>it.flag);
-      dayBlock+=`  [${c}]\n`;
-      norm.forEach(([i,it])=>{const b=state.boards[i];if(b)dayBlock+=`    ${b.type} ${b.material}T ${b.size} (${b.warehouse}) - ${fmtQty(it.qty)}\n`;});
-      if(chg.length){dayBlock+=`    -- 변경 요청 --\n`;chg.forEach(([i,it])=>{const b=state.boards[i];if(b)dayBlock+=`    ${b.type} ${b.material}T ${b.size} (${b.warehouse}) - ${fmtQty(it.qty)} (${it.flag==='cancel'?'취소':'추가'})\n`;});}
-      if(ord.note)dayBlock+=`    ※ ${ord.note}\n`;
+      dayBlock+=`- ${c}\n`;
+      norm.forEach(([i,it])=>{const b=state.boards[i];if(b)dayBlock+=`  ${b.type} ${b.material}T ${b.size} - ${fmtQty(it.qty)}\n`;});
+      if(chg.length){chg.forEach(([i,it])=>{const b=state.boards[i];if(b)dayBlock+=`  ${b.type} ${b.material}T ${b.size} - ${fmtQty(it.qty)}(${it.flag==='cancel'?'취소':'추가'})\n`;});}
+      if(ord.note)dayBlock+=`  ※ ${ord.note}\n`;
     });
-    if(dayBlock)body+=`▶ ${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS_KO[d.getDay()]})\n${dayBlock}\n`;
+    if(hasAny){body+=`${dayName}\n${dayBlock}\n`;}
+    else{body+=`${dayName} - 출고요청 없음\n\n`;}
   });
   body+=`감사합니다.\n${state.senderName} 드림`;
-  document.getElementById('mail-preview').textContent=hasData?body:'이 주간에 입력된 오더가 없습니다.';
-  document.getElementById('carrier-select').innerHTML=state.carriers.map(c=>
-    `<button class="company-btn ${state.selectedCarrier===c?'selected':''}" onclick="selectCarrier('${c}')">${c}</button>`
-  ).join('');
+  document.getElementById('mail-preview').textContent=body;
 }
 function selectCarrier(c){state.selectedCarrier=c;saveState();renderMail();}
 function sendMail(){

@@ -81,6 +81,16 @@ table.order-table tr.row-mfc-ww.group-start td{border-top:2px solid #A78BFA}
 table.order-table tr.row-mfc-iv.group-start td{border-top:2px solid #FB923C}
 .qty-input{width:72px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;text-align:center;background:#fff;color:var(--text);font-family:inherit;transition:border-color .15s}
 .qty-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(26,86,219,.1)}
+.flag-cell{display:flex;gap:4px}
+.flag-btn{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid;background:transparent;transition:all .15s;font-family:inherit}
+.flag-btn.cancel{border-color:#FCA5A5;color:var(--red)}
+.flag-btn.cancel.active{background:var(--red-light);border-color:var(--red)}
+.flag-btn.add{border-color:#6EE7B7;color:var(--green)}
+.flag-btn.add.active{background:var(--green-light);border-color:var(--green)}
+table.order-table tr.row-cancel td{background:var(--red-light)!important}
+table.order-table tr.row-cancel td:first-child{border-left:3px solid var(--red)}
+table.order-table tr.row-add td{background:var(--green-light)!important}
+table.order-table tr.row-add td:first-child{border-left:3px solid var(--green)}
 
 /* Note */
 .note-row{display:flex;align-items:center;gap:8px;margin-top:12px}
@@ -341,11 +351,16 @@ function renderOrderSection(){
   let rows='',lastType=null;
   filtered.forEach(({b,i})=>{
     const base=ROW_STYLE[b.type]||'',gs=b.type!==lastType&&base?'group-start':'';lastType=b.type;
-    const it=ord.items[i]||{qty:'',flag:''},qty=it.qty||'';
-    const cls=[base,gs].filter(Boolean).join(' ');
+    const it=ord.items[i]||{qty:'',flag:''},qty=it.qty||'',flag=it.flag||'';
+    const flagCls=flag==='cancel'?'row-cancel':(flag==='add'?'row-add':'');
+    const cls=[base,gs,flagCls].filter(Boolean).join(' ');
     rows+=`<tr class="${cls}">
       <td>${b.type}</td><td>${b.material}</td><td>${b.size}</td><td>${b.warehouse||'—'}</td>
       <td><input class="qty-input" type="text" value="${qty}" placeholder="-" onchange="setQty(${i},this.value)" onfocus="this.select()" inputmode="decimal"></td>
+      <td><div class="flag-cell">
+        <button class="flag-btn cancel ${flag==='cancel'?'active':''}" onclick="toggleFlag(${i},'cancel')">취소</button>
+        <button class="flag-btn add ${flag==='add'?'active':''}" onclick="toggleFlag(${i},'add')">추가</button>
+      </div></td>
     </tr>`;
   });
   el.innerHTML=`<div class="card">
@@ -354,7 +369,7 @@ function renderOrderSection(){
       <p>수량을 입력하세요. 숫자=CT, 예외시 직접 기재 (예: 3BD)</p>
     </div>
     <table class="order-table">
-      <thead><tr><th>구분</th><th>자재</th><th>사이즈</th><th>창고</th><th>수량</th></tr></thead>
+      <thead><tr><th>구분</th><th>자재</th><th>사이즈</th><th>창고</th><th>수량</th><th>변경 <span style="font-size:10px;font-weight:400">취소=0/추가=+1</span></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div style="padding:14px 16px;border-top:1px solid var(--border);background:#FAFAF8">
@@ -372,6 +387,16 @@ function setQty(idx,val){
   if(!state.orders[key])state.orders[key]={items:{},note:''};
   if(!state.orders[key].items[idx])state.orders[key].items[idx]={qty:'',flag:''};
   state.orders[key].items[idx].qty=String(val).trim();
+}
+
+function toggleFlag(idx,flag){
+  const key=orderKey(compSelectedDay,compSelectedCompany);
+  if(!state.orders[key])state.orders[key]={items:{},note:''};
+  if(!state.orders[key].items[idx])state.orders[key].items[idx]={qty:'',flag:''};
+  const item=state.orders[key].items[idx];
+  if(item.flag===flag){item.flag='';}
+  else{item.flag=flag;if(flag==='cancel')item.qty='0';else if(flag==='add'){const n=parseFloat(item.qty)||0;item.qty=String(n+1);}}
+  renderOrderSection();
 }
 function setNote(val){
   const key=orderKey(compSelectedDay,compSelectedCompany);
